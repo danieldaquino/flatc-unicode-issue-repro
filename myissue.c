@@ -15,21 +15,31 @@ int main(int argc, char *argv[])
     B = &builder;
     flatcc_builder_init(B);
 
-    Eclectic_FooBar_start_as_root(B);
-    Eclectic_FooBar_say_create_str(B, "hello");
-    Eclectic_FooBar_meal_add(B, Eclectic_Fruit_Orange);
-    Eclectic_FooBar_height_add(B, -8000);
-    Eclectic_FooBar_end_as_root(B);
-    buf = flatcc_builder_get_direct_buffer(B, &size);
-#if defined(PROVOKE_ERROR) || 0
-    /* Provoke error for testing. */
-    ((char*)buf)[0] = 42;
-#endif
-    ret = Eclectic_FooBar_verify_as_root(buf, size);
-    if (ret) {
-        hexdump("Eclectic.FooBar buffer for myissue", buf, size, stdout);
-        printf("could not verify Electic.FooBar table, got %s\n", flatcc_verify_error_string(ret));
+    char* json = "{\"name\":\"ひらがな\",\"height\":2}";
+    
+    /* Parse the JSON into a FlatBuffers table. */
+    flatbuffers_parser_t parser;
+    flatbuffers_parser_init(&parser);
+    if (!flatbuffers_parser_parse(&parser, json, strlen(json), 1)) {
+        printf("could not parse JSON: %s\n", flatbuffers_parser_error_string(&parser));
+        return 1;
     }
+    flatcc_json_parser_t ctx;
+    flatcc_json_parser_init(&ctx, flatbuffers_parser_get_buf(&parser), flatbuffers_parser_get_buf_size(&parser));
+    flatcc_json_parser_skip_whitespace(&ctx);
+    flatbuffers_table_t ref;
+    buf = Eclectic_FooBar_parse_json_table(&ctx, buf, end, &ref);
+    if (!buf) {
+        printf("could not parse JSON as FlatBuffers table: %s\n", flatcc_json_parser_error_string(&ctx));
+        return 1;
+    }
+    
+    // Check and print the "name" field of the parsed table.
+    if (!Eclectic_FooBar_name_has_value(ref)) {
+        printf("name field is missing\n");
+        return 1;
+    }
+
     flatcc_builder_clear(B);
     return ret;
 }
